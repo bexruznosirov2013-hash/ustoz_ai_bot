@@ -41,8 +41,13 @@ if not TOKEN:
         "Render Environment Variables ichiga BOT_TOKEN qo'ying."
     )
 
+
 BOOKS_DIR = Path("books")
-BOOKS_DIR.mkdir(exist_ok=True)
+BOOKS_DIR.mkdir(
+    parents=True,
+    exist_ok=True
+)
+
 
 GITHUB_RELEASE = (
     "https://github.com/"
@@ -50,6 +55,7 @@ GITHUB_RELEASE = (
     "ustoz_ai_bot/"
     "releases/download/v1.0.0/"
 )
+
 
 GRADE_ZIPS = {
     1: "books_1-sinf.zip",
@@ -65,9 +71,12 @@ GRADE_ZIPS = {
     11: "books_11-sinf.zip",
 }
 
+
 bot = Bot(
     token=TOKEN,
-    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+    default=DefaultBotProperties(
+        parse_mode=ParseMode.HTML
+    )
 )
 
 dp = Dispatcher()
@@ -80,11 +89,14 @@ dp = Dispatcher()
 class HealthHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
+
         self.send_response(200)
+
         self.send_header(
             "Content-Type",
             "text/plain; charset=utf-8"
         )
+
         self.end_headers()
 
         self.wfile.write(
@@ -98,11 +110,17 @@ class HealthHandler(BaseHTTPRequestHandler):
 def start_render_server():
 
     port = int(
-        os.getenv("PORT", "10000")
+        os.getenv(
+            "PORT",
+            "10000"
+        )
     )
 
     server = HTTPServer(
-        ("0.0.0.0", port),
+        (
+            "0.0.0.0",
+            port
+        ),
         HealthHandler
     )
 
@@ -115,7 +133,8 @@ def start_render_server():
 
     print(
         f"[RENDER] Health server "
-        f"{port}-portda ishga tushdi"
+        f"0.0.0.0:{port} da ishga tushdi",
+        flush=True
     )
 
 
@@ -123,7 +142,11 @@ def start_render_server():
 # BOOKS YUKLASH
 # ============================================================
 
-def download_file(url: str, destination: Path):
+def download_file(
+    url: str,
+    destination: Path
+):
+
     request = urllib.request.Request(
         url,
         headers={
@@ -136,54 +159,151 @@ def download_file(url: str, destination: Path):
         timeout=300
     ) as response:
 
-        with open(destination, "wb") as file:
+        with open(
+            destination,
+            "wb"
+        ) as file:
+
             while True:
-                chunk = response.read(1024 * 1024)
+
+                chunk = response.read(
+                    1024 * 1024
+                )
 
                 if not chunk:
                     break
 
-                file.write(chunk)
+                file.write(
+                    chunk
+                )
 
 
-def extract_zip(zip_path: Path, destination: Path):
-    destination.mkdir(
+# ============================================================
+# ZIP OCHISH
+# ============================================================
+
+def extract_zip(
+    zip_path: Path,
+    destination: Path,
+    grade: int
+):
+
+    grade_dir = (
+        destination /
+        f"{grade}-sinf"
+    )
+
+    grade_dir.mkdir(
         parents=True,
         exist_ok=True
     )
 
-    with zipfile.ZipFile(zip_path, "r") as archive:
-        archive.extractall(destination)
+    with zipfile.ZipFile(
+        zip_path,
+        "r"
+    ) as archive:
 
+        names = archive.namelist()
+
+        prefix = f"{grade}-sinf/"
+
+        has_grade_folder = any(
+            name.startswith(prefix)
+            for name in names
+        )
+
+        if has_grade_folder:
+
+            archive.extractall(
+                destination
+            )
+
+        else:
+
+            archive.extractall(
+                grade_dir
+            )
+
+
+# ============================================================
+# BOOKS TAYYORLASH
+# ============================================================
 
 async def prepare_books():
-    print("=" * 55)
-    print("USTOZ AI BOOKS TEKSHIRILMOQDA")
-    print("=" * 55)
+
+    print(
+        "=" * 55,
+        flush=True
+    )
+
+    print(
+        "USTOZ AI BOOKS TEKSHIRILMOQDA",
+        flush=True
+    )
+
+    print(
+        "=" * 55,
+        flush=True
+    )
+
 
     for grade, zip_name in GRADE_ZIPS.items():
 
-        grade_dir = BOOKS_DIR / f"{grade}-sinf"
+        grade_dir = (
+            BOOKS_DIR /
+            f"{grade}-sinf"
+        )
+
+
+        # ----------------------------------------------------
+        # AVVAL MAVJUD PDF LARNI TEKSHIRAMIZ
+        # ----------------------------------------------------
+
+        pdf_count = 0
 
         if grade_dir.exists():
+
             pdf_count = len(
-                list(grade_dir.rglob("*.pdf"))
+                list(
+                    grade_dir.rglob(
+                        "*.pdf"
+                    )
+                )
             )
 
-            if pdf_count > 0:
-                print(
-                    f"[OK] {grade}-sinf: "
-                    f"{pdf_count} ta PDF mavjud"
-                )
-                continue
 
-        zip_path = BOOKS_DIR / zip_name
-        url = GITHUB_RELEASE + zip_name
+        if pdf_count > 0:
+
+            print(
+                f"[OK] {grade}-sinf: "
+                f"{pdf_count} ta PDF mavjud",
+                flush=True
+            )
+
+            continue
+
+
+        # ----------------------------------------------------
+        # ZIP YUKLASH
+        # ----------------------------------------------------
+
+        zip_path = (
+            BOOKS_DIR /
+            zip_name
+        )
+
+        url = (
+            GITHUB_RELEASE +
+            zip_name
+        )
+
 
         print(
             f"[DOWNLOAD] {grade}-sinf "
-            f"darsliklari yuklanmoqda..."
+            f"darsliklari yuklanmoqda...",
+            flush=True
         )
+
 
         try:
 
@@ -193,42 +313,102 @@ async def prepare_books():
                 zip_path
             )
 
+
             print(
-                f"[OK] Yuklandi: {zip_name}"
+                f"[OK] Yuklandi: "
+                f"{zip_name}",
+                flush=True
             )
+
+
+            # ------------------------------------------------
+            # ZIP NI TO'G'RI PAPKAGA OCHISH
+            # ------------------------------------------------
 
             await asyncio.to_thread(
                 extract_zip,
                 zip_path,
-                BOOKS_DIR
+                BOOKS_DIR,
+                grade
             )
 
-            print(
-                f"[OK] Ochildi: {grade}-sinf"
+
+            # ------------------------------------------------
+            # NATIJANI TEKSHIRISH
+            # ------------------------------------------------
+
+            pdf_count = len(
+                list(
+                    grade_dir.rglob(
+                        "*.pdf"
+                    )
+                )
             )
+
+
+            if pdf_count > 0:
+
+                print(
+                    f"[OK] {grade}-sinf: "
+                    f"{pdf_count} ta PDF ochildi",
+                    flush=True
+                )
+
+            else:
+
+                print(
+                    f"[WARNING] {grade}-sinf "
+                    f"ichida PDF topilmadi!",
+                    flush=True
+                )
+
+
+            # ------------------------------------------------
+            # ZIP NI O'CHIRISH
+            # ------------------------------------------------
 
             try:
+
                 zip_path.unlink()
+
             except Exception:
                 pass
+
 
         except Exception as error:
 
             print(
-                f"[ERROR] {grade}-sinf: {error}"
+                f"[ERROR] {grade}-sinf: "
+                f"{error}",
+                flush=True
             )
 
-    print("=" * 55)
-
-    total_pdf = len(
-        list(BOOKS_DIR.rglob("*.pdf"))
-    )
 
     print(
-        f"Jami PDF: {total_pdf}"
+        "=" * 55,
+        flush=True
     )
 
-    print("=" * 55)
+
+    total_pdf = len(
+        list(
+            BOOKS_DIR.rglob(
+                "*.pdf"
+            )
+        )
+    )
+
+
+    print(
+        f"Jami PDF: {total_pdf}",
+        flush=True
+    )
+
+
+    print(
+        "=" * 55,
+        flush=True
+    )
 
 
 # ============================================================
@@ -236,9 +416,13 @@ async def prepare_books():
 # ============================================================
 
 class TeacherStates(StatesGroup):
+
     choosing_class = State()
+
     choosing_subject = State()
+
     choosing_book = State()
+
     entering_pages = State()
 
 
@@ -247,6 +431,7 @@ class TeacherStates(StatesGroup):
 # ============================================================
 
 USER_DATA = {}
+
 USED_QUESTIONS = {}
 
 
@@ -254,13 +439,22 @@ USED_QUESTIONS = {}
 # MATN TOZALASH
 # ============================================================
 
-def clean_text(text: str):
+def clean_text(
+    text: str
+):
 
     if not text:
         return ""
 
-    text = text.replace("\u00a0", " ")
-    text = text.replace("\r", "\n")
+    text = text.replace(
+        "\u00a0",
+        " "
+    )
+
+    text = text.replace(
+        "\r",
+        "\n"
+    )
 
     text = re.sub(
         r"[ \t]+",
@@ -277,9 +471,13 @@ def clean_text(text: str):
     return text.strip()
 
 
-def normalize_sentence(text: str):
+def normalize_sentence(
+    text: str
+):
 
-    text = clean_text(text)
+    text = clean_text(
+        text
+    )
 
     text = re.sub(
         r"^\d+$",
@@ -294,12 +492,16 @@ def normalize_sentence(text: str):
 # TELEGRAM HTML XAVFSIZ MATN
 # ============================================================
 
-def escape_html(text: str):
+def escape_html(
+    text: str
+):
 
     if not text:
         return ""
 
-    text = str(text)
+    text = str(
+        text
+    )
 
     text = text.replace(
         "&",
@@ -327,7 +529,10 @@ def class_keyboard():
 
     buttons = []
 
-    for i in range(1, 12):
+    for i in range(
+        1,
+        12
+    ):
 
         buttons.append(
             InlineKeyboardButton(
@@ -335,6 +540,7 @@ def class_keyboard():
                 callback_data=f"class:{i}"
             )
         )
+
 
     rows = []
 
@@ -345,8 +551,11 @@ def class_keyboard():
     ):
 
         rows.append(
-            buttons[i:i + 2]
+            buttons[
+                i:i + 2
+            ]
         )
+
 
     return InlineKeyboardMarkup(
         inline_keyboard=rows
@@ -357,17 +566,23 @@ def class_keyboard():
 # SUBJECT TOPISH
 # ============================================================
 
-def get_subjects(grade: int):
+def get_subjects(
+    grade: int
+):
 
     grade_dir = (
         BOOKS_DIR /
         f"{grade}-sinf"
     )
 
+
     if not grade_dir.exists():
+
         return []
 
+
     subjects = []
+
 
     for item in sorted(
         grade_dir.iterdir()
@@ -376,21 +591,28 @@ def get_subjects(grade: int):
         if item.is_dir():
 
             pdfs = list(
-                item.glob("*.pdf")
+                item.glob(
+                    "*.pdf"
+                )
             )
 
             if pdfs:
+
                 subjects.append(
                     item.name
                 )
 
+
     for pdf in sorted(
-        grade_dir.glob("*.pdf")
+        grade_dir.glob(
+            "*.pdf"
+        )
     ):
 
         subjects.append(
             pdf.stem
         )
+
 
     return subjects
 
@@ -409,10 +631,12 @@ def get_books(
         f"{grade}-sinf"
     )
 
+
     subject_dir = (
         grade_dir /
         subject
     )
+
 
     if (
         subject_dir.exists()
@@ -420,25 +644,38 @@ def get_books(
     ):
 
         return sorted(
-            subject_dir.glob("*.pdf")
+            subject_dir.glob(
+                "*.pdf"
+            )
         )
+
 
     direct_pdf = (
         grade_dir /
         f"{subject}.pdf"
     )
 
+
     if direct_pdf.exists():
-        return [direct_pdf]
+
+        return [
+            direct_pdf
+        ]
+
 
     result = []
+
 
     for pdf in grade_dir.glob(
         "*.pdf"
     ):
 
         if pdf.stem == subject:
-            result.append(pdf)
+
+            result.append(
+                pdf
+            )
+
 
     return result
 
@@ -447,14 +684,18 @@ def get_books(
 # SAHIFA FORMATINI TEKSHIRISH
 # ============================================================
 
-def parse_pages(value: str):
+def parse_pages(
+    value: str
+):
 
     value = value.strip()
+
 
     match = re.fullmatch(
         r"(\d+)\s*-\s*(\d+)",
         value
     )
+
 
     if match:
 
@@ -466,25 +707,39 @@ def parse_pages(value: str):
             match.group(2)
         )
 
+
         if start < 1 or end < 1:
+
             return None
+
 
         if start > end:
+
             return None
 
+
         if end - start + 1 > 100:
+
             return None
+
 
         return start, end
 
+
     if value.isdigit():
 
-        page = int(value)
+        page = int(
+            value
+        )
+
 
         if page < 1:
+
             return None
 
+
         return page, page
+
 
     return None
 
@@ -505,9 +760,11 @@ def read_pdf(
             pdf_path
         )
 
+
         total_pages = len(
             document
         )
+
 
         if total_pages == 0:
 
@@ -518,6 +775,7 @@ def read_pdf(
                 0,
                 "PDF bo'sh."
             )
+
 
         if start_page > total_pages:
 
@@ -530,12 +788,15 @@ def read_pdf(
                 f"sahifadan iborat."
             )
 
+
         real_end = min(
             end_page,
             total_pages
         )
 
+
         all_text = []
+
 
         for page_number in range(
             start_page - 1,
@@ -546,26 +807,35 @@ def read_pdf(
                 page_number
             ]
 
+
             text = page.get_text(
                 "text"
             )
 
+
             if text:
+
                 all_text.append(
                     text
                 )
 
+
         document.close()
 
+
         result = clean_text(
-            "\n".join(all_text)
+            "\n".join(
+                all_text
+            )
         )
+
 
         return (
             result,
             total_pages,
             None
         )
+
 
     except Exception as error:
 
@@ -580,19 +850,28 @@ def read_pdf(
 # GAP BO'LIB AJRATISH
 # ============================================================
 
-def split_into_sentences(text: str):
+def split_into_sentences(
+    text: str
+):
 
-    text = clean_text(text)
+    text = clean_text(
+        text
+    )
+
 
     if not text:
+
         return []
+
 
     parts = re.split(
         r"(?<=[.!?])\s+|\n+",
         text
     )
 
+
     sentences = []
+
 
     for part in parts:
 
@@ -600,18 +879,26 @@ def split_into_sentences(text: str):
             part
         )
 
+
         if not part:
+
             continue
+
 
         if len(part) < 35:
+
             continue
 
+
         if len(part) > 500:
+
             part = part[:500]
+
 
         sentences.append(
             part
         )
+
 
     return sentences
 
@@ -663,7 +950,9 @@ STOP_WORDS = {
 }
 
 
-def extract_words(text: str):
+def extract_words(
+    text: str
+):
 
     words = re.findall(
         r"[A-Za-zА-Яа-яЁёЎўҚқҒғҲҳ0-9]+"
@@ -671,21 +960,29 @@ def extract_words(text: str):
         text
     )
 
+
     result = []
+
 
     for word in words:
 
         clean = word.strip()
 
+
         if len(clean) < 3:
+
             continue
 
+
         if clean.lower() in STOP_WORDS:
+
             continue
+
 
         result.append(
             clean
         )
+
 
     return result
 
@@ -702,8 +999,11 @@ def choose_answer_word(
         sentence
     )
 
+
     if not words:
+
         return None
+
 
     candidates = [
         word
@@ -711,17 +1011,25 @@ def choose_answer_word(
         if 4 <= len(word) <= 25
     ]
 
+
     if not candidates:
+
         candidates = words
+
 
     candidates.sort(
         key=lambda x: len(x),
         reverse=True
     )
 
+
     top = candidates[
-        :min(5, len(candidates))
+        :min(
+            5,
+            len(candidates)
+        )
     ]
+
 
     return random.choice(
         top
@@ -741,32 +1049,42 @@ def make_distractors(
         source_text
     )
 
+
     unique = []
+
 
     correct_lower = (
         correct_answer.lower()
     )
 
+
     for word in words:
 
         if word.lower() == correct_lower:
+
             continue
+
 
         if word.lower() in {
             x.lower()
             for x in unique
         }:
+
             continue
+
 
         if (
             len(word) < 3
             or len(word) > 30
         ):
+
             continue
+
 
         unique.append(
             word
         )
+
 
     similar = [
         word
@@ -777,32 +1095,44 @@ def make_distractors(
         ) <= 6
     ]
 
+
     if len(similar) >= 3:
+
         unique = similar
+
 
     random.shuffle(
         unique
     )
 
+
     distractors = []
+
 
     for word in unique:
 
         if word.lower() == correct_lower:
+
             continue
+
 
         if word.lower() in {
             x.lower()
             for x in distractors
         }:
+
             continue
+
 
         distractors.append(
             word
         )
 
+
         if len(distractors) == 3:
+
             break
+
 
     return distractors
 
@@ -822,8 +1152,11 @@ def question_hash(
         + answer.strip().lower()
     )
 
+
     return hashlib.sha256(
-        raw.encode("utf-8")
+        raw.encode(
+            "utf-8"
+        )
     ).hexdigest()
 
 
@@ -841,43 +1174,58 @@ def generate_questions(
         source_text
     )
 
+
     if len(sentences) < 5:
+
         return []
+
 
     used = USED_QUESTIONS.setdefault(
         user_id,
         set()
     )
 
+
     random.shuffle(
         sentences
     )
 
+
     questions = []
+
 
     for sentence in sentences:
 
         if len(questions) >= count:
+
             break
+
 
         answer = choose_answer_word(
             sentence
         )
 
+
         if not answer:
+
             continue
+
 
         distractors = make_distractors(
             answer,
             source_text
         )
 
+
         if len(distractors) < 3:
+
             continue
+
 
         pattern = re.escape(
             answer
         )
+
 
         question_text = re.sub(
             pattern,
@@ -886,16 +1234,22 @@ def generate_questions(
             count=1
         )
 
+
         if question_text == sentence:
+
             continue
+
 
         q_hash = question_hash(
             question_text,
             answer
         )
 
+
         if q_hash in used:
+
             continue
+
 
         options = [
             answer,
@@ -904,33 +1258,56 @@ def generate_questions(
             distractors[2],
         ]
 
+
         random.shuffle(
             options
         )
 
+
         correct_letter = "ABCD"[
-            options.index(answer)
+            options.index(
+                answer
+            )
         ]
 
+
         question = {
-            "question": question_text,
+
+            "question":
+                question_text,
+
             "options": {
-                "A": options[0],
-                "B": options[1],
-                "C": options[2],
-                "D": options[3],
+
+                "A":
+                    options[0],
+
+                "B":
+                    options[1],
+
+                "C":
+                    options[2],
+
+                "D":
+                    options[3],
             },
-            "answer": correct_letter,
-            "answer_text": answer,
+
+            "answer":
+                correct_letter,
+
+            "answer_text":
+                answer,
         }
+
 
         questions.append(
             question
         )
 
+
         used.add(
             q_hash
         )
+
 
     return questions
 
@@ -948,11 +1325,15 @@ def question_to_text(
         question["question"]
     )
 
+
     result = []
 
+
     result.append(
-        f"<b>{index}. {question_text}</b>"
+        f"<b>{index}. "
+        f"{question_text}</b>"
     )
+
 
     for letter in [
         "A",
@@ -962,22 +1343,28 @@ def question_to_text(
     ]:
 
         option = escape_html(
-            question["options"][letter]
+            question["options"][
+                letter
+            ]
         )
+
 
         result.append(
             f"{letter}) {option}"
         )
 
+
     answer = escape_html(
         question["answer_text"]
     )
+
 
     result.append(
         f"✅ <b>To'g'ri javob: "
         f"{question['answer']}) "
         f"{answer}</b>"
     )
+
 
     return "\n".join(
         result
@@ -1003,7 +1390,9 @@ async def send_questions(
             start:start + 5
         ]
 
+
         text = []
+
 
         for local_index, question in enumerate(
             chunk,
@@ -1017,8 +1406,11 @@ async def send_questions(
                 )
             )
 
+
         await message.answer(
-            "\n\n".join(text)
+            "\n\n".join(
+                text
+            )
         )
 
 
@@ -1030,30 +1422,35 @@ def test_menu_keyboard():
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
+
             [
                 InlineKeyboardButton(
                     text="🔄 Yana 20 ta",
                     callback_data="again"
                 )
             ],
+
             [
                 InlineKeyboardButton(
                     text="📄 Word fayl",
                     callback_data="word"
                 )
             ],
+
             [
                 InlineKeyboardButton(
                     text="📚 Boshqa fan",
                     callback_data="subjects"
                 )
             ],
+
             [
                 InlineKeyboardButton(
                     text="🎓 Boshqa sinf",
                     callback_data="classes"
                 )
             ],
+
             [
                 InlineKeyboardButton(
                     text="🏠 Asosiy menyu",
@@ -1079,14 +1476,18 @@ def create_word_file(
 
     document = Document()
 
+
     title = document.add_heading(
         "USTOZ AI — TEST",
         level=0
     )
 
+
     title.alignment = 1
 
+
     p = document.add_paragraph()
+
 
     p.add_run(
         f"Sinf: {grade}-sinf\n"
@@ -1096,7 +1497,9 @@ def create_word_file(
         f"Testlar soni: {len(questions)}"
     )
 
+
     document.add_paragraph("")
+
 
     for index, question in enumerate(
         questions,
@@ -1105,11 +1508,15 @@ def create_word_file(
 
         p = document.add_paragraph()
 
+
         run = p.add_run(
-            f"{index}. {question['question']}"
+            f"{index}. "
+            f"{question['question']}"
         )
 
+
         run.bold = True
+
 
         for letter in [
             "A",
@@ -1123,7 +1530,9 @@ def create_word_file(
                 f"{question['options'][letter]}"
             )
 
+
         answer = document.add_paragraph()
+
 
         answer_run = answer.add_run(
             f"To'g'ri javob: "
@@ -1131,16 +1540,21 @@ def create_word_file(
             f"{question['answer_text']}"
         )
 
+
         answer_run.bold = True
 
+
         document.add_paragraph("")
+
 
     document.add_heading(
         "Javoblar kaliti",
         level=1
     )
 
+
     answer_text = []
+
 
     for index, question in enumerate(
         questions,
@@ -1148,29 +1562,40 @@ def create_word_file(
     ):
 
         answer_text.append(
-            f"{index}. {question['answer']}"
+            f"{index}. "
+            f"{question['answer']}"
         )
 
+
     document.add_paragraph(
-        " | ".join(answer_text)
+        " | ".join(
+            answer_text
+        )
     )
+
 
     styles = document.styles
 
+
     styles["Normal"].font.name = "Arial"
+
     styles["Normal"].font.size = Pt(11)
+
 
     filename = (
         f"ustoz_ai_{user_id}.docx"
     )
 
+
     filepath = Path(
         filename
     )
 
+
     document.save(
         filepath
     )
+
 
     return filepath
 
@@ -1179,7 +1604,9 @@ def create_word_file(
 # START
 # ============================================================
 
-@dp.message(Command("start"))
+@dp.message(
+    Command("start")
+)
 async def start_command(
     message: Message,
     state: FSMContext
@@ -1187,14 +1614,17 @@ async def start_command(
 
     await state.clear()
 
+
     await message.answer(
         "🎓 <b>USTOZ AI</b>\n\n"
         "O'qituvchilar uchun aqlli test generator.\n\n"
-        "Men darslikning siz ko'rsatgan sahifalarini "
-        "o'qib, shu mavzudan test tayyorlayman.\n\n"
+        "Men darslikning siz ko'rsatgan "
+        "sahifalarini o'qib, shu mavzudan "
+        "test tayyorlayman.\n\n"
         "📚 Avval sinfni tanlang:",
         reply_markup=class_keyboard()
     )
+
 
     await state.set_state(
         TeacherStates.choosing_class
@@ -1205,7 +1635,9 @@ async def start_command(
 # RESTART
 # ============================================================
 
-@dp.message(Command("restart"))
+@dp.message(
+    Command("restart")
+)
 async def restart_command(
     message: Message,
     state: FSMContext
@@ -1213,11 +1645,13 @@ async def restart_command(
 
     await state.clear()
 
+
     await message.answer(
         "🔄 <b>Jarayon qayta boshlandi!</b>\n\n"
         "🎓 Sinfni tanlang:",
         reply_markup=class_keyboard()
     )
+
 
     await state.set_state(
         TeacherStates.choosing_class
@@ -1228,7 +1662,9 @@ async def restart_command(
 # HELP
 # ============================================================
 
-@dp.message(Command("help"))
+@dp.message(
+    Command("help")
+)
 async def help_command(
     message: Message
 ):
@@ -1252,7 +1688,9 @@ async def help_command(
 # JOIN
 # ============================================================
 
-@dp.message(Command("join"))
+@dp.message(
+    Command("join")
+)
 async def join_command(
     message: Message
 ):
@@ -1282,14 +1720,17 @@ async def class_selected(
         callback.data.split(":")[1]
     )
 
+
     subjects = get_subjects(
         grade
     )
+
 
     await state.update_data(
         grade=grade,
         subjects=subjects
     )
+
 
     if not subjects:
 
@@ -1300,11 +1741,14 @@ async def class_selected(
             "🔄 /restart"
         )
 
+
         await callback.answer()
 
         return
 
+
     buttons = []
+
 
     for index, subject in enumerate(
         subjects
@@ -1319,6 +1763,7 @@ async def class_selected(
             ]
         )
 
+
     buttons.append(
         [
             InlineKeyboardButton(
@@ -1328,6 +1773,7 @@ async def class_selected(
         ]
     )
 
+
     await callback.message.edit_text(
         f"🎓 <b>{grade}-sinf</b>\n\n"
         "📚 Fanni tanlang:",
@@ -1336,9 +1782,11 @@ async def class_selected(
         )
     )
 
+
     await state.set_state(
         TeacherStates.choosing_subject
     )
+
 
     await callback.answer()
 
@@ -1358,14 +1806,17 @@ async def subject_selected(
 
     data = await state.get_data()
 
+
     subjects = data.get(
         "subjects",
         []
     )
 
+
     grade = data.get(
         "grade"
     )
+
 
     try:
 
@@ -1373,9 +1824,11 @@ async def subject_selected(
             callback.data.split(":")[1]
         )
 
+
         subject = subjects[
             index
         ]
+
 
     except (
         ValueError,
@@ -1389,10 +1842,12 @@ async def subject_selected(
 
         return
 
+
     books = get_books(
         grade,
         subject
     )
+
 
     await state.update_data(
         subject=subject,
@@ -1402,6 +1857,7 @@ async def subject_selected(
         ]
     )
 
+
     if not books:
 
         await callback.message.edit_text(
@@ -1410,11 +1866,14 @@ async def subject_selected(
             "Iltimos, /restart qiling."
         )
 
+
         await callback.answer()
 
         return
 
+
     buttons = []
+
 
     for i, book in enumerate(
         books
@@ -1429,6 +1888,7 @@ async def subject_selected(
             ]
         )
 
+
     buttons.append(
         [
             InlineKeyboardButton(
@@ -1437,6 +1897,7 @@ async def subject_selected(
             )
         ]
     )
+
 
     await callback.message.edit_text(
         f"🎓 {grade}-sinf\n"
@@ -1447,9 +1908,11 @@ async def subject_selected(
         )
     )
 
+
     await state.set_state(
         TeacherStates.choosing_book
     )
+
 
     await callback.answer()
 
@@ -1469,18 +1932,22 @@ async def book_selected(
 
     data = await state.get_data()
 
+
     books = data.get(
         "books",
         []
     )
 
+
     subject = data.get(
         "subject"
     )
 
+
     grade = data.get(
         "grade"
     )
+
 
     try:
 
@@ -1488,9 +1955,11 @@ async def book_selected(
             callback.data.split(":")[1]
         )
 
+
         book_path = Path(
             books[index]
         )
+
 
     except (
         ValueError,
@@ -1504,10 +1973,12 @@ async def book_selected(
 
         return
 
+
     await state.update_data(
         book=str(book_path),
         book_name=book_path.stem
     )
+
 
     await callback.message.edit_text(
         f"🎓 <b>{grade}-sinf</b>\n"
@@ -1520,9 +1991,11 @@ async def book_selected(
         "<code>15</code>"
     )
 
+
     await state.set_state(
         TeacherStates.entering_pages
     )
+
 
     await callback.answer()
 
@@ -1543,9 +2016,11 @@ async def pages_entered(
         message.text or ""
     ).strip()
 
+
     parsed = parse_pages(
         value
     )
+
 
     if not parsed:
 
@@ -1560,9 +2035,12 @@ async def pages_entered(
 
         return
 
+
     start_page, end_page = parsed
 
+
     data = await state.get_data()
+
 
     book = Path(
         data.get(
@@ -1571,17 +2049,21 @@ async def pages_entered(
         )
     )
 
+
     grade = data.get(
         "grade"
     )
+
 
     subject = data.get(
         "subject"
     )
 
+
     book_name = data.get(
         "book_name"
     )
+
 
     if not book.exists():
 
@@ -1592,17 +2074,20 @@ async def pages_entered(
 
         return
 
+
     await message.answer(
         "📖 Darslik o'qilmoqda...\n"
         f"📄 Sahifalar: {start_page}-{end_page}\n\n"
         "⏳ Biroz kuting..."
     )
 
+
     source_text, total_pages, error = read_pdf(
         book,
         start_page,
         end_page
     )
+
 
     if error:
 
@@ -1611,6 +2096,7 @@ async def pages_entered(
         )
 
         return
+
 
     if not source_text.strip():
 
@@ -1623,6 +2109,7 @@ async def pages_entered(
 
         return
 
+
     if end_page > total_pages:
 
         await message.answer(
@@ -1632,19 +2119,23 @@ async def pages_entered(
             "oralig'i ishlatildi."
         )
 
+
     await message.answer(
         "🧠 <b>20 ta test tayyorlanmoqda...</b>\n\n"
         "📚 Testlar faqat tanlangan sahifalardagi "
         "matndan tuziladi."
     )
 
+
     user_id = message.from_user.id
+
 
     questions = generate_questions(
         source_text=source_text,
         count=20,
         user_id=user_id
     )
+
 
     if len(questions) < 20:
 
@@ -1656,6 +2147,7 @@ async def pages_entered(
             "kengaytiring yoki boshqa sahifalarni tanlang."
         )
 
+
     if not questions:
 
         await message.answer(
@@ -1665,34 +2157,68 @@ async def pages_entered(
 
         return
 
+
     USER_DATA[user_id] = {
-        "source_text": source_text,
-        "questions": questions,
-        "grade": grade,
-        "subject": subject,
-        "book": str(book),
-        "book_name": book_name,
-        "page_range": (
-            f"{start_page}-{min(end_page, total_pages)}"
-        ),
+
+        "source_text":
+            source_text,
+
+        "questions":
+            questions,
+
+        "grade":
+            grade,
+
+        "subject":
+            subject,
+
+        "book":
+            str(book),
+
+        "book_name":
+            book_name,
+
+        "page_range":
+            (
+                f"{start_page}-"
+                f"{min(end_page, total_pages)}"
+            ),
     }
 
+
     await state.update_data(
-        source_text=source_text,
-        questions=questions,
-        grade=grade,
-        subject=subject,
-        book=str(book),
-        book_name=book_name,
-        page_range=(
-            f"{start_page}-{min(end_page, total_pages)}"
-        )
+
+        source_text=
+            source_text,
+
+        questions=
+            questions,
+
+        grade=
+            grade,
+
+        subject=
+            subject,
+
+        book=
+            str(book),
+
+        book_name=
+            book_name,
+
+        page_range=
+            (
+                f"{start_page}-"
+                f"{min(end_page, total_pages)}"
+            )
     )
+
 
     await send_questions(
         message,
         questions
     )
+
 
     await message.answer(
         "🎉 <b>Testlar tayyor!</b>\n\n"
@@ -1715,16 +2241,21 @@ async def again_questions(
 
     user_id = callback.from_user.id
 
+
     data = USER_DATA.get(
         user_id
     )
 
+
     if not data:
+
         data = await state.get_data()
+
 
     source_text = data.get(
         "source_text"
     )
+
 
     if not source_text:
 
@@ -1733,19 +2264,23 @@ async def again_questions(
             "Iltimos, /restart qiling."
         )
 
+
         await callback.answer()
 
         return
 
+
     await callback.message.answer(
         "🔄 <b>Yangi 20 ta test tayyorlanmoqda...</b>"
     )
+
 
     questions = generate_questions(
         source_text=source_text,
         count=20,
         user_id=user_id
     )
+
 
     if not questions:
 
@@ -1755,27 +2290,34 @@ async def again_questions(
             "📄 Boshqa sahifalarni tanlang."
         )
 
+
         await callback.answer()
 
         return
 
+
     data["questions"] = questions
 
+
     USER_DATA[user_id] = data
+
 
     await state.update_data(
         questions=questions
     )
+
 
     await send_questions(
         callback.message,
         questions
     )
 
+
     await callback.message.answer(
         "✅ Yangi testlar tayyor!",
         reply_markup=test_menu_keyboard()
     )
+
 
     await callback.answer()
 
@@ -1794,16 +2336,21 @@ async def word_callback(
 
     user_id = callback.from_user.id
 
+
     data = USER_DATA.get(
         user_id
     )
 
+
     if not data:
+
         data = await state.get_data()
+
 
     questions = data.get(
         "questions"
     )
+
 
     if not questions:
 
@@ -1814,24 +2361,36 @@ async def word_callback(
 
         return
 
+
     await callback.message.answer(
         "📄 <b>Word fayl tayyorlanmoqda...</b>"
     )
+
 
     try:
 
         filepath = create_word_file(
             user_id=user_id,
             questions=questions,
-            grade=data.get("grade"),
-            subject=data.get("subject"),
-            book_name=data.get("book_name"),
-            page_range=data.get("page_range")
+            grade=data.get(
+                "grade"
+            ),
+            subject=data.get(
+                "subject"
+            ),
+            book_name=data.get(
+                "book_name"
+            ),
+            page_range=data.get(
+                "page_range"
+            )
         )
+
 
         document = FSInputFile(
             filepath
         )
+
 
         await callback.message.answer_document(
             document=document,
@@ -1843,10 +2402,14 @@ async def word_callback(
             )
         )
 
+
         try:
+
             filepath.unlink()
+
         except Exception:
             pass
+
 
     except Exception as error:
 
@@ -1854,6 +2417,7 @@ async def word_callback(
             "❌ Word yaratishda xatolik:\n"
             f"<code>{escape_html(error)}</code>"
         )
+
 
     await callback.answer()
 
@@ -1872,9 +2436,11 @@ async def back_to_subjects(
 
     data = await state.get_data()
 
+
     grade = data.get(
         "grade"
     )
+
 
     if not grade:
 
@@ -1882,13 +2448,16 @@ async def back_to_subjects(
 
         return
 
+
     subjects = get_subjects(
         grade
     )
 
+
     await state.update_data(
         subjects=subjects
     )
+
 
     if not subjects:
 
@@ -1897,11 +2466,14 @@ async def back_to_subjects(
             "📚 Darsliklar topilmadi."
         )
 
+
         await callback.answer()
 
         return
 
+
     buttons = []
+
 
     for index, subject in enumerate(
         subjects
@@ -1916,6 +2488,7 @@ async def back_to_subjects(
             ]
         )
 
+
     buttons.append(
         [
             InlineKeyboardButton(
@@ -1925,6 +2498,7 @@ async def back_to_subjects(
         ]
     )
 
+
     await callback.message.edit_text(
         f"🎓 <b>{grade}-sinf</b>\n\n"
         "📚 Fanni tanlang:",
@@ -1933,9 +2507,11 @@ async def back_to_subjects(
         )
     )
 
+
     await state.set_state(
         TeacherStates.choosing_subject
     )
+
 
     await callback.answer()
 
@@ -1954,14 +2530,17 @@ async def back_to_classes(
 
     await state.clear()
 
+
     await callback.message.edit_text(
         "🎓 <b>Sinfni tanlang:</b>",
         reply_markup=class_keyboard()
     )
 
+
     await state.set_state(
         TeacherStates.choosing_class
     )
+
 
     await callback.answer()
 
@@ -1980,6 +2559,7 @@ async def home_callback(
 
     await state.clear()
 
+
     await callback.message.edit_text(
         "🏠 <b>USTOZ AI</b>\n\n"
         "O'qituvchi uchun test generator.\n\n"
@@ -1987,9 +2567,11 @@ async def home_callback(
         reply_markup=class_keyboard()
     )
 
+
     await state.set_state(
         TeacherStates.choosing_class
     )
+
 
     await callback.answer()
 
@@ -2019,20 +2601,57 @@ async def main():
 
     start_render_server()
 
-    print("=" * 55)
-    print("USTOZ AI ISHGA TAYYORLANMOQDA")
-    print("=" * 55)
+
+    print(
+        "=" * 55,
+        flush=True
+    )
+
+
+    print(
+        "USTOZ AI ISHGA TAYYORLANMOQDA",
+        flush=True
+    )
+
+
+    print(
+        "=" * 55,
+        flush=True
+    )
+
 
     await prepare_books()
 
-    print("=" * 55)
-    print("USTOZ AI ISHGA TUSHDI")
-    print("=" * 55)
+
+    print(
+        "=" * 55,
+        flush=True
+    )
+
+
+    print(
+        "USTOZ AI ISHGA TUSHDI",
+        flush=True
+    )
+
+
+    print(
+        "=" * 55,
+        flush=True
+    )
+
 
     await dp.start_polling(
         bot
     )
 
 
+# ============================================================
+# RUN
+# ============================================================
+
 if __name__ == "__main__":
-    asyncio.run(main())
+
+    asyncio.run(
+        main()
+    )
