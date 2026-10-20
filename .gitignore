@@ -1,0 +1,6 @@
+﻿books/
+books_backup_before_cleanup/
+.venv/
+__pycache__/
+*.pyc
+.env
