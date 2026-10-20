@@ -1,10 +1,12 @@
-﻿import asyncio
+import asyncio
 import os
 import re
 import random
 import hashlib
 import urllib.request
 import zipfile
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 import pymupdf as fitz
@@ -69,6 +71,52 @@ bot = Bot(
 )
 
 dp = Dispatcher()
+
+
+# ============================================================
+# RENDER HEALTH SERVER
+# ============================================================
+
+class HealthHandler(BaseHTTPRequestHandler):
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header(
+            "Content-Type",
+            "text/plain; charset=utf-8"
+        )
+        self.end_headers()
+
+        self.wfile.write(
+            b"USTOZ AI ISHLAYAPTI"
+        )
+
+    def log_message(self, format, *args):
+        return
+
+
+def start_render_server():
+
+    port = int(
+        os.getenv("PORT", "10000")
+    )
+
+    server = HTTPServer(
+        ("0.0.0.0", port),
+        HealthHandler
+    )
+
+    thread = threading.Thread(
+        target=server.serve_forever,
+        daemon=True
+    )
+
+    thread.start()
+
+    print(
+        f"[RENDER] Health server "
+        f"{port}-portda ishga tushdi"
+    )
 
 
 # ============================================================
@@ -206,7 +254,7 @@ USED_QUESTIONS = {}
 # MATN TOZALASH
 # ============================================================
 
-def clean_text(text: str) -> str:
+def clean_text(text: str):
 
     if not text:
         return ""
@@ -229,7 +277,7 @@ def clean_text(text: str) -> str:
     return text.strip()
 
 
-def normalize_sentence(text: str) -> str:
+def normalize_sentence(text: str):
 
     text = clean_text(text)
 
@@ -246,7 +294,7 @@ def normalize_sentence(text: str) -> str:
 # TELEGRAM HTML XAVFSIZ MATN
 # ============================================================
 
-def escape_html(text: str) -> str:
+def escape_html(text: str):
 
     if not text:
         return ""
@@ -1968,6 +2016,8 @@ async def unknown_message(
 # ============================================================
 
 async def main():
+
+    start_render_server()
 
     print("=" * 55)
     print("USTOZ AI ISHGA TAYYORLANMOQDA")
